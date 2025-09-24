@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { Aptos, AptosConfig, Network, Ed25519PrivateKey } from '@aptos-labs/ts-sdk'
+import { Aptos, AptosConfig, Network, Ed25519PrivateKey, Account } from '@aptos-labs/ts-sdk'
 import { config } from '@/lib/config'
 
 export async function POST() {
@@ -36,7 +36,7 @@ export async function POST() {
 
     // Create keeper account from private key
     const privateKey = new Ed25519PrivateKey(config.keeper.privateKey)
-    const keeper = privateKey.toAccount()
+    const keeper = Account.fromPrivateKey({ privateKey })
 
     // Start a new round
     const transaction = await aptos.transaction.build.simple({
