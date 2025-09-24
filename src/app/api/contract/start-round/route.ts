@@ -44,7 +44,6 @@ export async function POST() {
       data: {
         function: `${config.aptos.moduleAddress}::betting::start_round`,
         functionArguments: [
-          config.aptos.moduleAddress, // orion_betting_addr
           startPriceInMicroDollars, // start_price in micro-dollars
           config.keeper.roundDuration, // duration_secs (default: 300 = 5 minutes)
         ],
