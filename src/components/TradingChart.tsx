@@ -19,6 +19,7 @@ export function TradingChart() {
   
   const { priceHistory, addPricePoint, currentPrice } = useBettingStore()
   const [betMarkers, setBetMarkers] = useState<BetMarker[]>([])
+  const [initialized, setInitialized] = useState(false)
 
   // Initialize chart
   useEffect(() => {
@@ -81,14 +82,86 @@ export function TradingChart() {
   // Update chart with price history
   useEffect(() => {
     if (lineSeriesRef.current && priceHistory.length > 0) {
-      const data: LineData[] = priceHistory.map(point => ({
-        time: Math.floor(point.time / 1000) as Time,
-        value: point.value,
-      }))
+      // Create data with unique timestamps and sort by time
+      const uniqueData = new Map<number, number>()
       
-      lineSeriesRef.current.setData(data)
+      priceHistory.forEach(point => {
+        const timeKey = Math.floor(point.time / 1000)
+        // Use the latest price for each timestamp
+        uniqueData.set(timeKey, point.value)
+      })
+      
+      // Convert to array and sort by time
+      const data: LineData[] = Array.from(uniqueData.entries())
+        .sort(([timeA], [timeB]) => timeA - timeB)
+        .map(([time, value]) => ({
+          time: time as Time,
+          value,
+        }))
+      
+      if (data.length > 0) {
+        lineSeriesRef.current.setData(data)
+      }
     }
   }, [priceHistory])
+
+  // Fetch initial price data
+  useEffect(() => {
+    const fetchInitialPrice = async () => {
+      if (initialized) return
+      
+      try {
+        const response = await fetch('/api/price')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.price && data.timestamp) {
+            console.log('Fetched initial price:', data)
+            addPricePoint(data.price)
+          }
+        } else {
+          // Fallback to demo data if API fails
+          console.log('API failed, using demo data')
+          const now = Date.now()
+          const demoPoints: Array<{ time: number; value: number }> = []
+          for (let i = 49; i >= 0; i--) {
+            const time = now - (i * 60 * 1000)
+            const basePrice = 12.5
+            const variation = (Math.sin(i * 0.1) + Math.random() * 0.2 - 0.1) * 0.5
+            const price = basePrice + variation
+            demoPoints.push({ time, value: price })
+          }
+          
+          useBettingStore.setState((state) => ({
+            ...state,
+            priceHistory: demoPoints,
+            currentPrice: demoPoints[demoPoints.length - 1]?.value || 12.5,
+          }))
+        }
+      } catch (error) {
+        console.error('Failed to fetch initial price:', error)
+        // Use demo data as fallback
+        const now = Date.now()
+        const demoPoints: Array<{ time: number; value: number }> = []
+        for (let i = 49; i >= 0; i--) {
+          const time = now - (i * 60 * 1000)
+          const basePrice = 12.5
+          const variation = (Math.sin(i * 0.1) + Math.random() * 0.2 - 0.1) * 0.5
+          const price = basePrice + variation
+          demoPoints.push({ time, value: price })
+        }
+        
+        useBettingStore.setState((state) => ({
+          ...state,
+          priceHistory: demoPoints,
+          currentPrice: demoPoints[demoPoints.length - 1]?.value || 12.5,
+        }))
+      } finally {
+        setInitialized(true)
+      }
+    }
+
+    fetchInitialPrice()
+  }, [initialized, addPricePoint])
 
   // WebSocket connection for live price updates
   useEffect(() => {
@@ -142,6 +215,27 @@ export function TradingChart() {
       }
     }
   }, [addPricePoint])
+
+  // Periodic price updates as backup to WebSocket
+  useEffect(() => {
+    if (!initialized) return
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/price')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.price) {
+            addPricePoint(data.price)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch periodic price update:', error)
+      }
+    }, 5000) // Update every 5 seconds
+
+    return () => clearInterval(interval)
+  }, [initialized, addPricePoint])
 
   // Add bet markers to chart
   useEffect(() => {

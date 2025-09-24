@@ -71,13 +71,29 @@ export const useBettingStore = create<BettingState>((set) => ({
   
   addPricePoint: (price) => {
     const now = Date.now()
-    set((state) => ({
-      currentPrice: price,
-      priceHistory: [
-        ...state.priceHistory.slice(-1000), // Keep last 1000 points
-        { time: now, value: price }
-      ]
-    }))
+    set((state) => {
+      // Avoid duplicate timestamps by checking the last entry
+      const lastEntry = state.priceHistory[state.priceHistory.length - 1]
+      const timeKey = Math.floor(now / 1000) * 1000 // Round to nearest second
+      
+      if (lastEntry && Math.floor(lastEntry.time / 1000) * 1000 === timeKey) {
+        // Update the last entry instead of adding a new one
+        const updatedHistory = [...state.priceHistory.slice(0, -1), { time: now, value: price }]
+        return {
+          currentPrice: price,
+          priceHistory: updatedHistory.slice(-1000), // Keep last 1000 points
+        }
+      } else {
+        // Add new entry
+        return {
+          currentPrice: price,
+          priceHistory: [
+            ...state.priceHistory.slice(-1000), // Keep last 1000 points
+            { time: now, value: price }
+          ]
+        }
+      }
+    })
   },
   
   setCurrentRound: (round) => set({ currentRound: round }),

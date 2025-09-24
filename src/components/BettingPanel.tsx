@@ -4,12 +4,12 @@ import { useState } from 'react'
 import { useWallet } from '@aptos-labs/wallet-adapter-react'
 import { Button } from '@/components/ui/Button'
 import { useBettingStore } from '@/store/betting'
-// import { contractFunctions, aptos } from '@/lib/aptos'
+import { contractFunctions } from '@/lib/aptos'
 import { formatTime, formatCurrency, cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Clock, DollarSign } from 'lucide-react'
 
 export function BettingPanel() {
-  const { connected, account } = useWallet()
+  const { connected, account, signAndSubmitTransaction } = useWallet()
   const {
     currentRound,
     timeRemaining,
@@ -25,7 +25,7 @@ export function BettingPanel() {
 
   // Handle bet placement
   const handlePlaceBet = async (side: 'up' | 'down') => {
-    if (!connected || !account || !currentRound || isPlacingBet) return
+    if (!connected || !account || !currentRound || isPlacingBet || !signAndSubmitTransaction) return
 
     const amount = parseFloat(betAmount)
     if (amount <= 0) return
@@ -34,18 +34,30 @@ export function BettingPanel() {
     setSelectedSide(side)
 
     try {
-      // TODO: Implement transaction after Move contract deployment
-      // For now, simulate the bet placement
       console.log(`Placing ${side} bet of ${amount} APT on round ${currentRound.id}`)
       
-      // Simulate transaction delay
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Convert APT to octas (1 APT = 100,000,000 octas)
+      const amountInOctas = Math.floor(amount * 100000000)
+      
+      // Create transaction payload
+      const payload = contractFunctions.placeBet(
+        currentRound.id,
+        side === 'up',
+        amountInOctas
+      )
 
-      // Add bet to local state for demo purposes
+      // Submit transaction
+      const response = await signAndSubmitTransaction({
+        data: payload,
+      })
+
+      console.log('Transaction submitted:', response)
+
+      // Add bet to local state
       addUserBet({
         roundId: currentRound.id,
         side,
-        amount: Math.floor(amount * 100000000), // Convert to octas
+        amount: amountInOctas,
         timestamp: Date.now(),
       })
 
@@ -54,9 +66,14 @@ export function BettingPanel() {
         (window as unknown as { addBetMarker: (side: string, price: number) => void }).addBetMarker(side, currentPrice)
       }
 
-      console.log('Demo bet placed successfully')
-    } catch (error) {
+      console.log('Bet placed successfully:', response.hash)
+      
+      // Reset bet amount after successful bet
+      setBetAmount('0.1')
+      
+    } catch (error: any) {
       console.error('Error placing bet:', error)
+      alert(`Failed to place bet: ${error.message || 'Unknown error'}`)
     } finally {
       setIsPlacingBet(false)
       setSelectedSide(null)

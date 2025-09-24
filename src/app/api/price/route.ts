@@ -4,7 +4,7 @@ import { config } from '@/lib/config'
 export async function GET() {
   try {
     const response = await fetch(
-      `${config.pyth.endpoint}/v2/updates/price/latest?ids[]=${config.pyth.aptUsdPriceId}&parsed=true`,
+      `${config.pyth.endpoint}/api/latest_price_feeds?ids[]=${config.pyth.aptUsdPriceId}`,
       {
         next: { revalidate: 1 }, // Cache for 1 second
       }
@@ -16,11 +16,16 @@ export async function GET() {
 
     const data = await response.json()
     
-    if (!data.parsed || data.parsed.length === 0) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       throw new Error('No price data received from Pyth')
     }
 
-    const priceData = data.parsed[0].price
+    const priceFeed = data[0]
+    if (!priceFeed || !priceFeed.price) {
+      throw new Error('Invalid price feed data')
+    }
+
+    const priceData = priceFeed.price
     const price = parseFloat(priceData.price) * Math.pow(10, priceData.expo)
     const confidence = parseFloat(priceData.conf) * Math.pow(10, priceData.expo)
     const timestamp = parseInt(priceData.publish_time)
@@ -30,11 +35,12 @@ export async function GET() {
       confidence,
       timestamp,
       symbol: 'APT/USD',
+      raw: priceData, // Include raw data for debugging
     })
   } catch (error) {
     console.error('Error fetching price:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch price data' },
+      { error: 'Failed to fetch price data', details: error.message },
       { status: 500 }
     )
   }

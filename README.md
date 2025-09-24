@@ -77,13 +77,26 @@ ROUND_DURATION_SECONDS=300
 
 ### 3. Deploy Move Contract
 
-Navigate to the move directory and deploy:
+**Option A: Automated Deployment (Recommended)**
+
+```bash
+# Run the automated deployment script
+./scripts/deploy-contracts.sh
+```
+
+This script will:
+- ✅ Compile and deploy the contract
+- ✅ Extract the deployed address
+- ✅ Update your `.env.local` automatically
+- ✅ Show next steps
+
+**Option B: Manual Deployment**
 
 ```bash
 cd move
 
 # Initialize Aptos account (if needed)
-aptos init
+aptos init --network testnet
 
 # Compile the contract
 aptos move compile
@@ -91,14 +104,25 @@ aptos move compile
 # Deploy to testnet
 aptos move publish --named-addresses orion_betting=default
 
-# Note the deployed address for .env.local
+# Note the deployed address and update .env.local manually
 ```
-
-Update `NEXT_PUBLIC_MODULE_ADDRESS` in `.env.local` with the deployed address.
 
 ### 4. Initialize Contract
 
-After deployment, initialize the contract:
+**Option A: Automated Initialization (Recommended)**
+
+```bash
+# Run the initialization script
+./scripts/init-contract.sh
+```
+
+This script will:
+- ✅ Read your deployed contract address
+- ✅ Use your current account as admin
+- ✅ Prompt for treasury address and fee percentage
+- ✅ Initialize the contract with your settings
+
+**Option B: Manual Initialization**
 
 ```bash
 # Replace with your admin address, fee (200 = 2%), and treasury address
