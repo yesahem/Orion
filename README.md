@@ -1,36 +1,350 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Orion - APT/USD Binary Options DApp
 
-## Getting Started
+A Next.js + Aptos DApp for 5-minute APT/USD binary betting with real-time price feeds from Pyth Network.
 
-First, run the development server:
+## Features
+
+- **Binary Options Trading**: Bet UP or DOWN on APT/USD price movements over 5-minute intervals
+- **Real-time Price Data**: Live price feeds via Pyth Network WebSocket integration
+- **Interactive Charts**: TradingView-style charts with bet markers using lightweight-charts
+- **Wallet Integration**: Seamless Aptos wallet connection (Petra, Pontem, Martian)
+- **Automated Rounds**: Keeper system for automatic round start/settlement
+- **Fair Settlement**: Oracle-based price settlement with fee distribution
+- **Claim System**: Winners claim proportional shares; ties get refunds
+
+## Architecture
+
+### Frontend (Next.js)
+- **Framework**: Next.js 15 with App Router
+- **Styling**: Tailwind CSS with custom dark theme
+- **State Management**: Zustand for global app state
+- **Charts**: Lightweight Charts for price visualization
+- **Wallet**: Aptos Wallet Adapter for multi-wallet support
+
+### Smart Contract (Move)
+- **Module**: `orion_betting::betting` with comprehensive betting logic
+- **Events**: BetPlaced, RoundSettled, WinningsClaimed for tracking
+- **Security**: Admin-only functions, timing validation, proper fee handling
+- **Testing**: Complete test suite covering win/loss/tie scenarios
+
+### Backend APIs
+- **Price Feed**: `/api/price` - Pyth Network integration
+- **Keeper**: `/api/keeper/start` and `/api/keeper/settle` for automation
+- **WebSocket**: Real-time price streaming for live charts
+
+## Setup Instructions
+
+### Prerequisites
+
+- Node.js 18+ and Bun (recommended) or npm
+- Aptos CLI for Move contract deployment
+- Git for version control
+
+### 1. Clone and Install
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+git clone <repository-url>
+cd orion
+bun install
+```
+
+### 2. Environment Configuration
+
+Copy the example environment file:
+
+```bash
+cp env.example .env.local
+```
+
+Edit `.env.local` with your configuration:
+
+```env
+# Aptos Network Configuration
+NEXT_PUBLIC_APTOS_NETWORK=testnet
+NEXT_PUBLIC_APTOS_NODE_URL=https://fullnode.testnet.aptoslabs.com/v1
+
+# Move Module Configuration (update after deployment)
+NEXT_PUBLIC_MODULE_ADDRESS=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+
+# Pyth Configuration
+NEXT_PUBLIC_PYTH_ENDPOINT=https://hermes.pyth.network
+NEXT_PUBLIC_PYTH_APT_USD_PRICE_ID=0x03ae4db29ed4ae33d323568895aa00337e658e348b37509f5372ae51f0af00d5
+
+# Keeper Configuration (for automated round management)
+KEEPER_PRIVATE_KEY=your_keeper_private_key_here
+ROUND_DURATION_SECONDS=300
+```
+
+### 3. Deploy Move Contract
+
+**Option A: Automated Deployment (Recommended)**
+
+```bash
+# Run the automated deployment script
+./scripts/deploy-contracts.sh
+```
+
+This script will:
+- ✅ Compile and deploy the contract
+- ✅ Extract the deployed address
+- ✅ Update your `.env.local` automatically
+- ✅ Show next steps
+
+**Option B: Manual Deployment**
+
+```bash
+cd move
+
+# Initialize Aptos account (if needed)
+aptos init --network testnet
+
+# Compile the contract
+aptos move compile
+
+# Deploy to testnet
+aptos move publish --named-addresses orion_betting=default
+
+# Note the deployed address and update .env.local manually
+```
+
+### 4. Initialize Contract
+
+**Option A: Automated Initialization (Recommended)**
+
+```bash
+# Run the initialization script
+./scripts/init-contract.sh
+```
+
+This script will:
+- ✅ Read your deployed contract address
+- ✅ Use your current account as admin
+- ✅ Prompt for treasury address and fee percentage
+- ✅ Initialize the contract with your settings
+
+**Option B: Manual Initialization**
+
+```bash
+# Replace with your admin address, fee (200 = 2%), and treasury address
+aptos move run \
+  --function-id "0xYOUR_ADDRESS::betting::init" \
+  --args address:0xYOUR_ADMIN_ADDRESS u64:200 address:0xYOUR_TREASURY_ADDRESS
+```
+
+### 5. Run Development Server
+
+```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit `http://localhost:3000` to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Testing the Move Contract
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run the comprehensive test suite:
 
-## Learn More
+```bash
+cd move
+aptos move test
+```
 
-To learn more about Next.js, take a look at the following resources:
+Tests cover:
+- ✅ Full betting flow (place bets, settle, claim)
+- ✅ Tie scenarios with refunds
+- ✅ Win scenarios with proportional payouts
+- ✅ Edge cases (no opposite bets = 2x payout)
+- ✅ Fee calculation and distribution
+- ✅ Access control and timing validation
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Keeper System
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The keeper system automates round management:
 
-## Deploy on Vercel
+### Manual Keeper Operations
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Start a new round:
+```bash
+curl -X POST http://localhost:3000/api/keeper/start
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Settle a round:
+```bash
+curl -X POST http://localhost:3000/api/keeper/settle \
+  -H "Content-Type: application/json" \
+  -d '{"roundId": 1}'
+```
+
+### Automated Keeper (Production)
+
+For production, set up automated calls:
+
+1. **Cron Jobs**: Schedule regular API calls
+2. **Background Services**: Node.js intervals or separate keeper service
+3. **External Services**: Use services like GitHub Actions or cloud functions
+
+Example cron for round start (every 5 minutes):
+```bash
+*/5 * * * * curl -X POST https://your-domain.com/api/keeper/start
+```
+
+## Usage Guide
+
+### For Users
+
+1. **Connect Wallet**: Click "Connect Wallet" and choose your Aptos wallet
+2. **View Current Round**: See countdown timer and current pools
+3. **Place Bets**: Enter amount and click UP or DOWN before time expires
+4. **Monitor Chart**: Watch live price movements with your bet markers
+5. **Claim Winnings**: After round settlement, claim your winnings if you won
+
+### For Administrators
+
+1. **Deploy Contract**: Follow deployment instructions above
+2. **Initialize System**: Set fee percentage and treasury address
+3. **Monitor Rounds**: Ensure keeper system is functioning
+4. **Manage Treasury**: Collect fees and manage protocol funds
+
+## API Reference
+
+### GET /api/price
+
+Get current APT/USD price from Pyth Network.
+
+**Response:**
+```json
+{
+  "price": 12.3456,
+  "confidence": 0.0012,
+  "timestamp": 1699123456,
+  "symbol": "APT/USD"
+}
+```
+
+### POST /api/keeper/start
+
+Start a new betting round (admin only).
+
+**Response:**
+```json
+{
+  "success": true,
+  "transactionHash": "0x...",
+  "startPrice": 12345600,
+  "timestamp": 1699123456
+}
+```
+
+### POST /api/keeper/settle
+
+Settle an expired round (admin only).
+
+**Body:**
+```json
+{
+  "roundId": 1
+}
+```
+
+## Smart Contract Interface
+
+### Entry Functions
+
+- `init(admin, fee_bps, treasury)` - Initialize contract
+- `start_round(start_price, duration_secs)` - Start new round
+- `place_bet(side_up: bool, amount: u64)` - Place a bet
+- `settle(round_id, end_price)` - Settle round
+- `claim(round_id)` - Claim winnings
+
+### View Functions
+
+- `get_round(round_id)` - Get round details
+- `get_user_bet(round_id, user_addr)` - Get user's bet
+- `get_current_round_id()` - Get latest round ID
+
+### Events
+
+- `BetPlaced` - Emitted when user places bet
+- `RoundSettled` - Emitted when round is settled
+- `WinningsClaimed` - Emitted when user claims winnings
+
+## Deployment
+
+### Vercel Deployment
+
+1. Push code to GitHub
+2. Connect repository to Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy automatically on push
+
+### Environment Variables for Production
+
+Ensure all environment variables are set:
+
+- `NEXT_PUBLIC_APTOS_NETWORK=mainnet` (for production)
+- `NEXT_PUBLIC_APTOS_NODE_URL=https://fullnode.mainnet.aptoslabs.com/v1`
+- `NEXT_PUBLIC_MODULE_ADDRESS=<deployed_address>`
+- `NEXT_PUBLIC_PYTH_ENDPOINT=https://hermes.pyth.network`
+- `NEXT_PUBLIC_PYTH_APT_USD_PRICE_ID=<pyth_price_id>`
+- `KEEPER_PRIVATE_KEY=<keeper_private_key>`
+
+## Security Considerations
+
+1. **Private Keys**: Never commit private keys. Use secure environment variable management.
+2. **Access Control**: Only admin can start/settle rounds
+3. **Timing Validation**: Bets only accepted before expiry
+4. **Oracle Security**: Uses Pyth Network for tamper-resistant pricing
+5. **Fee Limits**: Maximum 5% fee hardcoded in contract
+6. **Reentrancy**: Move's resource model prevents reentrancy attacks
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Wallet Connection Failed**
+   - Ensure wallet extension is installed and unlocked
+   - Check network matches (testnet/mainnet)
+
+2. **Transaction Failed**
+   - Verify sufficient APT balance for gas + bet amount
+   - Check if round has expired
+   - Ensure contract is properly deployed
+
+3. **Price Feed Issues**
+   - Verify Pyth endpoint is accessible
+   - Check price ID is correct for APT/USD
+   - Ensure WebSocket connection is stable
+
+4. **Keeper Not Working**
+   - Verify keeper private key has sufficient balance
+   - Check API endpoints are accessible
+   - Ensure proper timing for round management
+
+### Debug Mode
+
+Enable debug logging by setting:
+```env
+NODE_ENV=development
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open Pull Request
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## Support
+
+For support and questions:
+- Create GitHub issue for bugs
+- Join our Discord for community support
+- Check documentation for common solutions
+
+---
+
+Built with ❤️ on Aptos using Pyth Network price feeds.
