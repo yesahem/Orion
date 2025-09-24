@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useWallet } from '@aptos-labs/wallet-adapter-react'
 import { Button } from '@/components/ui/Button'
 import { useBettingStore } from '@/store/betting'
-import { contractFunctions } from '@/lib/aptos'
+import { contractFunctions, viewFunctions } from '@/lib/aptos'
 import { formatTime, formatCurrency, cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Clock, DollarSign } from 'lucide-react'
 
@@ -22,6 +22,41 @@ export function BettingPanel() {
   } = useBettingStore()
 
   const [selectedSide, setSelectedSide] = useState<'up' | 'down' | null>(null)
+  const [isClaiming, setIsClaiming] = useState(false)
+  const [userBet, setUserBet] = useState<{sideUp: boolean, amount: number, claimed: boolean} | null>(null)
+  const [potentialPayout, setPotentialPayout] = useState<number>(0)
+
+  // Load user bet information for current round
+  useEffect(() => {
+    const loadUserBet = async () => {
+      if (!connected || !account || !currentRound) {
+        setUserBet(null)
+        setPotentialPayout(0)
+        return
+      }
+
+      try {
+        // Get user bet for current round
+        const bet = await viewFunctions.getUserBet(currentRound.id, account.address)
+        if (bet) {
+          setUserBet(bet)
+          
+          // Get potential payout
+          const payout = await viewFunctions.calculatePotentialPayout(currentRound.id, account.address)
+          setPotentialPayout(payout)
+        } else {
+          setUserBet(null)
+          setPotentialPayout(0)
+        }
+      } catch (error) {
+        console.log('No bet found for user in current round')
+        setUserBet(null)
+        setPotentialPayout(0)
+      }
+    }
+
+    loadUserBet()
+  }, [connected, account, currentRound])
 
   // Handle bet placement
   const handlePlaceBet = async (side: 'up' | 'down') => {
@@ -80,9 +115,56 @@ export function BettingPanel() {
     }
   }
 
+  // Handle claiming winnings
+  const handleClaimWinnings = async () => {
+    if (!connected || !account || !currentRound || isClaiming) return
+
+    setIsClaiming(true)
+
+    try {
+      console.log(`Claiming winnings for round ${currentRound.id}`)
+      
+      const response = await fetch('/api/claim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          roundId: currentRound.id,
+          userAddress: account.address,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        console.log('Winnings claimed successfully:', result.transactionHash)
+        alert(`Winnings claimed! Transaction: ${result.transactionHash}`)
+        
+        // Refresh user bet information
+        if (userBet) {
+          setUserBet({...userBet, claimed: true})
+        }
+      } else {
+        console.error('Failed to claim winnings:', result.error)
+        alert(`Failed to claim: ${result.details || result.error}`)
+      }
+    } catch (error: any) {
+      console.error('Error claiming winnings:', error)
+      alert(`Error claiming: ${error.message}`)
+    } finally {
+      setIsClaiming(false)
+    }
+  }
+
   // Format pool display
   const formatPool = (pool: number) => {
     return formatCurrency(pool, 8) + ' APT'
+  }
+
+  // Calculate potential 1.8x payout
+  const calculatePotentialPayout = (betAmount: number) => {
+    return betAmount * 1.8
   }
 
   if (!currentRound) {
@@ -142,6 +224,47 @@ export function BettingPanel() {
         </div>
       </div>
 
+      {/* User Bet Information */}
+      {connected && userBet && (
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <h3 className="text-sm font-semibold text-white mb-3">Your Bet</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">Side:</span>
+              <span className={cn(
+                "font-semibold",
+                userBet.sideUp ? 'text-green-400' : 'text-red-400'
+              )}>
+                {userBet.sideUp ? '📈 UP' : '📉 DOWN'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">Amount:</span>
+              <span className="text-white font-mono">
+                {formatCurrency(userBet.amount, 8)} APT
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">Potential Payout:</span>
+              <span className="text-green-400 font-mono font-bold">
+                {formatCurrency(potentialPayout, 8)} APT
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">Potential Profit:</span>
+              <span className="text-yellow-400 font-mono">
+                +{formatCurrency(potentialPayout - userBet.amount, 8)} APT
+              </span>
+            </div>
+            {userBet.claimed && (
+              <div className="text-center text-green-400 text-sm font-semibold mt-2">
+                ✅ Already Claimed
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Betting Interface */}
       {!isRoundExpired && connected ? (
         <div className="space-y-4">
@@ -163,6 +286,23 @@ export function BettingPanel() {
                 disabled={isPlacingBet}
               />
             </div>
+            {/* Potential Payout Display */}
+            {parseFloat(betAmount) > 0 && (
+              <div className="mt-2 p-3 bg-gray-800 rounded-lg border border-gray-700">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-400">Potential Payout (1.8x):</span>
+                  <span className="text-green-400 font-mono font-bold">
+                    {calculatePotentialPayout(parseFloat(betAmount)).toFixed(2)} APT
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
+                  <span>Your Profit:</span>
+                  <span className="text-yellow-400">
+                    +{(calculatePotentialPayout(parseFloat(betAmount)) - parseFloat(betAmount)).toFixed(2)} APT
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Bet Buttons */}
@@ -217,6 +357,44 @@ export function BettingPanel() {
       ) : (
         <div className="text-center py-8">
           <p className="text-gray-400">Betting closed for this round</p>
+        </div>
+      )}
+
+      {/* Claiming Section */}
+      {connected && currentRound && currentRound.settled && userBet && !userBet.claimed && potentialPayout > 0 && (
+        <div className="border-t border-gray-700 pt-4">
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-white text-center">
+              Round #{currentRound.id} Results
+            </h3>
+            
+            {/* Round Result */}
+            <div className="text-center p-3 bg-gray-800 rounded-lg">
+              <div className="text-sm text-gray-400 mb-1">Winner:</div>
+              <div className={cn(
+                "text-lg font-bold",
+                currentRound.winSide === 'up' ? 'text-green-400' : 
+                currentRound.winSide === 'down' ? 'text-red-400' : 'text-yellow-400'
+              )}>
+                {currentRound.winSide === 'up' ? '📈 UP' : 
+                 currentRound.winSide === 'down' ? '📉 DOWN' : '⚖️ TIE'}
+              </div>
+            </div>
+
+            {/* Claim Button */}
+            <Button
+              onClick={handleClaimWinnings}
+              disabled={isClaiming}
+              className="w-full h-12 text-lg font-bold bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white"
+            >
+              <DollarSign className="w-5 h-5 mr-2" />
+              {isClaiming ? 'Claiming...' : 'Claim Winnings (1.8x)'}
+            </Button>
+            
+            <p className="text-xs text-gray-500 text-center">
+              Click to claim your winnings if you won this round
+            </p>
+          </div>
         </div>
       )}
 

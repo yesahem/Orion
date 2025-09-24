@@ -1,7 +1,8 @@
 export const config = {
   aptos: {
     network: (process.env.NEXT_PUBLIC_APTOS_NETWORK as 'testnet' | 'mainnet') || 'testnet',
-    nodeUrl: process.env.NEXT_PUBLIC_APTOS_NODE_URL || 'https://fullnode.testnet.aptoslabs.com/v1',
+    nodeUrl: process.env.NEXT_PUBLIC_APTOS_NODE_URL || 'https://api.testnet.aptoslabs.com/v1',
+    apiKey: process.env.NEXT_PUBLIC_APTOS_API_KEY || 'AG-2MB32AJQVQZDCSGYFRMTOZC1GKAHEGUSW',
     moduleAddress: process.env.NEXT_PUBLIC_MODULE_ADDRESS || '0x521ede792ad5eee5aece4e9e14bdf3c931f5e8d54939efc39b38afd7dd872cea',
   },
   pyth: {

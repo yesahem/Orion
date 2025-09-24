@@ -31,6 +31,14 @@ export async function POST() {
     // Initialize Aptos client
     const aptosConfig = new AptosConfig({
       network: config.aptos.network as Network,
+      fullnode: config.aptos.nodeUrl,
+      clientConfig: {
+        HEADERS: {
+          Authorization: `Bearer ${config.aptos.apiKey}`,
+          Origin: 'http://localhost:3001',
+          'Content-Type': 'application/json',
+        }
+      },
     })
     const aptos = new Aptos(aptosConfig)
 

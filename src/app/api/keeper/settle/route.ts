@@ -23,6 +23,14 @@ export async function POST(request: Request) {
     // Initialize Aptos client
     const aptosConfig = new AptosConfig({
       network: config.aptos.network as Network,
+      fullnode: config.aptos.nodeUrl,
+      clientConfig: {
+        HEADERS: {
+          Authorization: `Bearer ${config.aptos.apiKey}`,
+          Origin: 'http://localhost:3000',
+          'Content-Type': 'application/json',
+        }
+      },
     })
     const aptos = new Aptos(aptosConfig)
 
@@ -63,7 +71,7 @@ export async function POST(request: Request) {
     await new Promise(resolve => setTimeout(resolve, 5000))
 
     // Get current price for next round
-    const priceResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/price`)
+    const priceResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3001'}/api/price`)
     if (!priceResponse.ok) {
       throw new Error('Failed to fetch current price for next round')
     }

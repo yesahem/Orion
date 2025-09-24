@@ -2,6 +2,7 @@ module orion_betting::betting {
     use std::signer;
     use std::timestamp;
     use std::error;
+    use std::vector;
     use aptos_framework::coin;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::event;
@@ -21,6 +22,8 @@ module orion_betting::betting {
     // Constants
     const MAX_FEE_BPS: u64 = 500; // 5%
     const MIN_BET_AMOUNT: u64 = 1000000; // 0.01 APT (8 decimals)
+    const WIN_MULTIPLIER: u64 = 180; // 1.8x multiplier (stored as 180/100)
+    const MULTIPLIER_BASE: u64 = 100;
 
     // Structs
     struct State has key {
@@ -257,10 +260,8 @@ module orion_betting::betting {
         };
     }
 
-    // Helper function to calculate payout
-    fun calculate_payout(round: &Round, user_bet: &UserBet, fee_bps: u64): u64 {
-        let total_pool = round.up_pool + round.down_pool;
-        
+    // Helper function to calculate payout with 1.8x multiplier
+    fun calculate_payout(round: &Round, user_bet: &UserBet, _fee_bps: u64): u64 {
         // Handle tie case - refund original bet
         if (round.start_price == round.end_price) {
             return user_bet.amount
@@ -277,24 +278,8 @@ module orion_betting::betting {
             return 0
         };
 
-        // Calculate winning pool and losing pool
-        let (winning_pool, losing_pool) = if (user_bet.side_up) {
-            (round.up_pool, round.down_pool)
-        } else {
-            (round.down_pool, round.up_pool)
-        };
-
-        // If no one bet on the losing side, return 2x the bet
-        if (losing_pool == 0) {
-            return user_bet.amount * 2
-        };
-
-        // Calculate proportional share of the losing pool after fees
-        let fee_amount = (total_pool * fee_bps) / 10000;
-        let distributable_amount = total_pool - fee_amount;
-        let user_share = (user_bet.amount * distributable_amount) / winning_pool;
-        
-        user_share
+        // Winner gets 1.8x their bet amount
+        (user_bet.amount * WIN_MULTIPLIER) / MULTIPLIER_BASE
     }
 
     // View functions
@@ -331,5 +316,42 @@ module orion_betting::betting {
     public fun get_current_round_id(admin_addr: address): u64 acquires State {
         let state = borrow_global<State>(admin_addr);
         state.current_id
+    }
+
+    // View function to calculate potential payout for a user bet
+    #[view]
+    public fun calculate_potential_payout(admin_addr: address, round_id: u64, user_addr: address): u64 acquires State {
+        let state = borrow_global<State>(admin_addr);
+        assert!(table::contains(&state.rounds, round_id), error::not_found(E_ROUND_NOT_FOUND));
+        
+        let round = table::borrow(&state.rounds, round_id);
+        if (!table::contains(&round.user_bets, user_addr)) {
+            return 0
+        };
+        
+        let user_bet = table::borrow(&round.user_bets, user_addr);
+        if (!round.settled) {
+            // Return potential 1.8x payout for active bets
+            return (user_bet.amount * WIN_MULTIPLIER) / MULTIPLIER_BASE
+        } else {
+            // Return actual calculated payout for settled rounds
+            return calculate_payout(round, user_bet, state.fee_bps)
+        }
+    }
+
+    // Batch claim winnings for multiple users in a round
+    public entry fun batch_claim(
+        admin: &signer,
+        round_id: u64,
+        user_addresses: vector<address>
+    ) acquires State {
+        let i = 0;
+        let len = vector::length(&user_addresses);
+        
+        while (i < len) {
+            let user_addr = *vector::borrow(&user_addresses, i);
+            claim(admin, round_id, user_addr);
+            i = i + 1;
+        };
     }
 }

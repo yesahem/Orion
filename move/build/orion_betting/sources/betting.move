@@ -221,21 +221,6 @@ module orion_betting::betting {
         });
     }
 
-    // Settle and automatically start next round
-    public entry fun settle_and_start_next(
-        admin: &signer,
-        round_id: u64,
-        end_price: u64,
-        next_start_price: u64,
-        next_duration_secs: u64
-    ) acquires State {
-        // First settle the current round
-        settle(admin, round_id, end_price);
-        
-        // Start next round
-        start_round(admin, next_start_price, next_duration_secs);
-    }
-
     // Claim winnings from a settled round - admin distributes winnings
     public entry fun claim(
         admin: &signer,
@@ -272,22 +257,6 @@ module orion_betting::betting {
                 user: user_addr,
                 amount: payout,
             });
-        };
-    }
-
-    // Batch claim winnings for multiple users in a round
-    public entry fun batch_claim(
-        admin: &signer,
-        round_id: u64,
-        user_addresses: vector<address>
-    ) acquires State {
-        let i = 0;
-        let len = vector::length(&user_addresses);
-        
-        while (i < len) {
-            let user_addr = *vector::borrow(&user_addresses, i);
-            claim(admin, round_id, user_addr);
-            i = i + 1;
         };
     }
 
@@ -349,44 +318,7 @@ module orion_betting::betting {
         state.current_id
     }
 
-    #[view]
-    public fun get_user_claimable_rounds(admin_addr: address, user_addr: address): vector<u64> acquires State {
-        let state = borrow_global<State>(admin_addr);
-        let claimable_rounds = vector::empty<u64>();
-        let i = 1;
-        
-        while (i <= state.current_id) {
-            if (table::contains(&state.rounds, i)) {
-                let round = table::borrow(&state.rounds, i);
-                if (round.settled && table::contains(&round.user_bets, user_addr)) {
-                    let user_bet = table::borrow(&round.user_bets, user_addr);
-                    if (!user_bet.claimed) {
-                        let payout = calculate_payout(round, user_bet, state.fee_bps);
-                        if (payout > 0) {
-                            vector::push_back(&mut claimable_rounds, i);
-                        };
-                    };
-                };
-            };
-            i = i + 1;
-        };
-        
-        claimable_rounds
-    }
-
-    #[view]
-    public fun get_round_winners(admin_addr: address, round_id: u64): vector<address> acquires State {
-        let state = borrow_global<State>(admin_addr);
-        assert!(table::contains(&state.rounds, round_id), error::not_found(E_ROUND_NOT_FOUND));
-        
-        let round = table::borrow(&state.rounds, round_id);
-        assert!(round.settled, error::invalid_state(E_ROUND_ALREADY_SETTLED));
-        
-        // This is a simplified version - in practice, you'd need to iterate through all bets
-        // For now, return empty vector as table iteration is complex in Move
-        vector::empty<address>()
-    }
-
+    // View function to calculate potential payout for a user bet
     #[view]
     public fun calculate_potential_payout(admin_addr: address, round_id: u64, user_addr: address): u64 acquires State {
         let state = borrow_global<State>(admin_addr);
@@ -405,5 +337,21 @@ module orion_betting::betting {
             // Return actual calculated payout for settled rounds
             return calculate_payout(round, user_bet, state.fee_bps)
         }
+    }
+
+    // Batch claim winnings for multiple users in a round
+    public entry fun batch_claim(
+        admin: &signer,
+        round_id: u64,
+        user_addresses: vector<address>
+    ) acquires State {
+        let i = 0;
+        let len = vector::length(&user_addresses);
+        
+        while (i < len) {
+            let user_addr = *vector::borrow(&user_addresses, i);
+            claim(admin, round_id, user_addr);
+            i = i + 1;
+        };
     }
 }
