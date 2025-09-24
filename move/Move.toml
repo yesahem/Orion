@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = ["Orion Team"]
 
 [addresses]
-orion_betting = "_"
+orion_betting = "0xb03c43414394cfa7cba596f295ae936fd4dc96437d48e61adc7e2a37a00d5e61"
 
 [dev-addresses]
 orion_betting = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
