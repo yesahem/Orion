@@ -19,12 +19,14 @@ export default function Home() {
     currentRound,
   } = useBettingStore()
 
-  // Check if we need to start the first round
+  // Auto-manage rounds (start first round if needed, settle expired rounds)
   useEffect(() => {
-    const checkAndStartFirstRound = async () => {
+    const autoManageRounds = async () => {
       try {
         const currentRoundId = await viewFunctions.getCurrentRoundId()
+        
         if (currentRoundId === 0) {
+          // No rounds exist, start first round
           console.log('No rounds exist, starting first round...')
           const startResponse = await fetch('/api/keeper/start', {
             method: 'POST',
@@ -35,14 +37,31 @@ export default function Home() {
           } else {
             console.error('Failed to start first round:', startResult.error)
           }
+        } else {
+          // Check if current round needs to be settled and next one started
+          const manageResponse = await fetch('/api/keeper/auto-manage', {
+            method: 'POST',
+          })
+          const manageResult = await manageResponse.json()
+          
+          if (manageResult.success) {
+            console.log('Auto-manage result:', manageResult.message, manageResult.action)
+          } else {
+            console.error('Auto-manage failed:', manageResult.error)
+          }
         }
       } catch (error) {
-        console.error('Error checking/starting first round:', error)
+        console.error('Error in auto-manage rounds:', error)
       }
     }
 
-    // Check once when component mounts
-    checkAndStartFirstRound()
+    // Initial check when component mounts
+    autoManageRounds()
+    
+    // Set up interval to check every 10 seconds for expired rounds
+    const interval = setInterval(autoManageRounds, 10000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   // Load current round and update countdown
