@@ -2,7 +2,7 @@ export const config = {
   aptos: {
     network: (process.env.NEXT_PUBLIC_APTOS_NETWORK as 'testnet' | 'mainnet') || 'testnet',
     nodeUrl: process.env.NEXT_PUBLIC_APTOS_NODE_URL || 'https://fullnode.testnet.aptoslabs.com/v1',
-    moduleAddress: process.env.NEXT_PUBLIC_MODULE_ADDRESS || '0x1',
+    moduleAddress: process.env.NEXT_PUBLIC_MODULE_ADDRESS || '0x521ede792ad5eee5aece4e9e14bdf3c931f5e8d54939efc39b38afd7dd872cea',
   },
   pyth: {
     endpoint: process.env.NEXT_PUBLIC_PYTH_ENDPOINT || 'https://hermes.pyth.network',

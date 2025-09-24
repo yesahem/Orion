@@ -28,12 +28,12 @@ export const contractFunctions = {
     ],
   }),
 
-  // Claim winnings
-  claim: (roundId: number) => ({
+  // Claim winnings (admin claims for user)
+  claim: (roundId: number, userAddress: string) => ({
     function: `${config.aptos.moduleAddress}::betting::claim`,
     functionArguments: [
-      config.aptos.moduleAddress,
       roundId,
+      userAddress,
     ],
   }),
 

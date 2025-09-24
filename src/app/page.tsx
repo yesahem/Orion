@@ -19,47 +19,50 @@ export default function Home() {
     currentRound,
   } = useBettingStore()
 
-  // Initialize contract if needed
+  // Auto-manage rounds (start first round if needed, settle expired rounds)
   useEffect(() => {
-    const initializeContract = async () => {
+    const autoManageRounds = async () => {
       try {
-        const response = await fetch('/api/contract/init', {
-          method: 'POST',
-        })
-        const result = await response.json()
+        const currentRoundId = await viewFunctions.getCurrentRoundId()
         
-        if (result.success) {
-          console.log('Contract initialized:', result.message)
-          
-          // Start a round if no current round exists
-          if (!currentRound) {
-            setTimeout(async () => {
-              try {
-                const startResponse = await fetch('/api/contract/start-round', {
-                  method: 'POST',
-                })
-                const startResult = await startResponse.json()
-                if (startResult.success) {
-                  console.log('Round started:', startResult.message)
-                } else {
-                  console.error('Failed to start round:', startResult.error)
-                }
-              } catch (error) {
-                console.error('Error starting round:', error)
-              }
-            }, 2000)
+        if (currentRoundId === 0) {
+          // No rounds exist, start first round
+          console.log('No rounds exist, starting first round...')
+          const startResponse = await fetch('/api/keeper/start', {
+            method: 'POST',
+          })
+          const startResult = await startResponse.json()
+          if (startResult.success) {
+            console.log('First round started:', startResult.message)
+          } else {
+            console.error('Failed to start first round:', startResult.error)
           }
         } else {
-          console.error('Failed to initialize contract:', result.error)
+          // Check if current round needs to be settled and next one started
+          const manageResponse = await fetch('/api/keeper/auto-manage', {
+            method: 'POST',
+          })
+          const manageResult = await manageResponse.json()
+          
+          if (manageResult.success) {
+            console.log('Auto-manage result:', manageResult.message, manageResult.action)
+          } else {
+            console.error('Auto-manage failed:', manageResult.error)
+          }
         }
       } catch (error) {
-        console.error('Error initializing contract:', error)
+        console.error('Error in auto-manage rounds:', error)
       }
     }
 
-    // Only initialize once when the component mounts
-    initializeContract()
-  }, []) // Empty dependency array - run only once
+    // Initial check when component mounts
+    autoManageRounds()
+    
+    // Set up interval to check every 10 seconds for expired rounds
+    const interval = setInterval(autoManageRounds, 10000)
+    
+    return () => clearInterval(interval)
+  }, [])
 
   // Load current round and update countdown
   useEffect(() => {
@@ -93,30 +96,9 @@ export default function Home() {
               winSide,
             })
           }
-        } else {
-          // No rounds yet - create a demo round for UI testing
-          setCurrentRound({
-            id: 1,
-            startPrice: 12.5000,
-            expiryTimeSecs: Math.floor(Date.now() / 1000) + 300, // 5 minutes from now
-            settled: false,
-            upPool: 50000000, // 0.5 APT in octas
-            downPool: 75000000, // 0.75 APT in octas
-            totalPool: 125000000,
-          })
         }
       } catch (error) {
-        console.warn('Contract not deployed yet, using demo data:', error)
-        // Create a demo round for UI testing
-        setCurrentRound({
-          id: 1,
-          startPrice: 12.5000,
-          expiryTimeSecs: Math.floor(Date.now() / 1000) + 300, // 5 minutes from now
-          settled: false,
-          upPool: 50000000, // 0.5 APT in octas
-          downPool: 75000000, // 0.75 APT in octas
-          totalPool: 125000000,
-        })
+        console.error('Error loading current round:', error)
       }
     }
 
@@ -197,33 +179,7 @@ export default function Home() {
 
         setPastRounds(pastRoundsData.reverse()) // Most recent first
       } catch (error) {
-        console.warn('Contract not deployed yet, using demo past rounds:', error)
-        // Create demo past rounds for UI testing
-        const demoPastRounds = [
-          {
-            id: 3,
-            startPrice: 12000000, // $12.00
-            endPrice: 12500000,   // $12.50 (UP won)
-            expiryTimeSecs: Math.floor(Date.now() / 1000) - 600, // 10 minutes ago
-            settled: true,
-            upPool: 80000000,     // 0.8 APT
-            downPool: 40000000,   // 0.4 APT
-            totalPool: 120000000,
-            winSide: 'up' as const,
-          },
-          {
-            id: 2,
-            startPrice: 11800000, // $11.80
-            endPrice: 11600000,   // $11.60 (DOWN won)
-            expiryTimeSecs: Math.floor(Date.now() / 1000) - 900, // 15 minutes ago
-            settled: true,
-            upPool: 30000000,     // 0.3 APT
-            downPool: 70000000,   // 0.7 APT
-            totalPool: 100000000,
-            winSide: 'down' as const,
-          },
-        ]
-        setPastRounds(demoPastRounds)
+        console.error('Error loading past rounds:', error)
       }
     }
 
