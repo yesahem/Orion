@@ -38,7 +38,7 @@ export async function POST() {
       const currentPrice = priceData.price
 
       // Call the settle endpoint to settle current round and start next
-      const settleResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/keeper/settle`, {
+      const settleResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3001'}/api/keeper/settle`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

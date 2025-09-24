@@ -11,6 +11,13 @@ import { config } from './config'
 const aptosConfig = new AptosConfig({ 
   network: config.aptos.network as Network,
   fullnode: config.aptos.nodeUrl,
+  clientConfig: {
+    HEADERS: {
+      Authorization: `Bearer ${config.aptos.apiKey}`,
+      Origin: 'http://localhost:3000',
+      'Content-Type': 'application/json',
+    }
+  },
 })
 
 export const aptos = new Aptos(aptosConfig)
@@ -34,6 +41,15 @@ export const contractFunctions = {
     functionArguments: [
       roundId,
       userAddress,
+    ],
+  }),
+
+  // Batch claim winnings for multiple users
+  batchClaim: (roundId: number, userAddresses: string[]) => ({
+    function: `${config.aptos.moduleAddress}::betting::batch_claim`,
+    functionArguments: [
+      roundId,
+      userAddresses,
     ],
   }),
 
@@ -124,6 +140,23 @@ export const viewFunctions = {
       return parseInt(result[0] as string)
     } catch (error) {
       console.error('Error getting current round ID:', error)
+      return 0
+    }
+  },
+
+  // Calculate potential payout for a user bet (1.8x system)
+  async calculatePotentialPayout(roundId: number, userAddress: string): Promise<number> {
+    try {
+      const result = await aptos.view({
+        payload: {
+          function: `${config.aptos.moduleAddress}::betting::calculate_potential_payout`,
+          functionArguments: [config.aptos.moduleAddress, roundId, userAddress],
+        },
+      })
+      
+      return parseInt(result[0] as string)
+    } catch (error) {
+      console.error('Error calculating potential payout:', error)
       return 0
     }
   },
