@@ -1,0 +1,41 @@
+[install]
+# Bun configuration for faster installs and better compatibility
+
+# Use exact versions for better reproducibility
+exact = true
+
+# Cache directory
+cache = "node_modules/.cache/bun"
+
+# Registry configuration
+registry = "https://registry.npmjs.org"
+
+# Optional: Configure scoped registries
+# [install.scopes]
+# "@aptos-labs" = "https://registry.npmjs.org"
+
+[install.lockfile]
+# Save lockfile
+save = true
+
+# Print lockfile changes
+print = "yarn"
+
+[test]
+# Test configuration
+preload = ["./test-setup.ts"]
+coverage = true
+
+[build]
+# Build configuration for better performance
+target = "browser"
+format = "esm"
+splitting = true
+minify = true
+
+# Development settings
+[dev]
+# Hot reload
+hot = true
+# Port for dev server (if using bun for serving)
+port = 3000

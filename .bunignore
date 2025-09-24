@@ -1,0 +1,56 @@
+# Bun ignore file - similar to .npmignore but for Bun
+
+# Dependencies
+node_modules/
+bun.lockb
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Environment files
+.env*
+!.env.example
+!env.template
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Temporary folders
+tmp/
+temp/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Move build artifacts
+move/build/
+
+# Test artifacts
+test-results/
